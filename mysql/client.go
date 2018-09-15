@@ -12,6 +12,7 @@ const (
 	CLIENT_TYPENAME = "mysql{client}"
 )
 
+// Client mysql
 type Client struct {
 	DB      *sql.DB
 	Timeout time.Duration

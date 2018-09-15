@@ -16,7 +16,7 @@ func clientConnectMethod(L *lua.LState) int {
 
 	if tb == nil || !ok {
 		L.ArgError(2, "options excepted")
-		return 2
+		return 0
 	}
 
 	host, _ := options["host"].(string)

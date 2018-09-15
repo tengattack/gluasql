@@ -1,4 +1,4 @@
-package gluasql_mysql
+package gluasql_sqlite3
 
 import (
 	"reflect"
