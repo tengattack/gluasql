@@ -16,7 +16,7 @@ L := lua.NewState()
 defer L.Close()
 
 // Preload LuaSql modules
-gluasocket.Preload(L)
+gluasql.Preload(L)
 ```
 
 Or if we only need `mysql` module:
