@@ -21,7 +21,13 @@ func clientQueryMethod(L *lua.LState) int {
 		return 0
 	}
 
-	rows, err := client.DB.Query(query)
+	top := L.GetTop()
+	args := make([]interface{}, 0, top-2)
+	for i := 3; i <= top; i++ {
+		args = append(args, util.GetValue(L, i))
+	}
+
+	rows, err := client.DB.Query(query, args...)
 	if err != nil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString(err.Error()))
