@@ -7,19 +7,32 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/tengattack/gluasql"
-	"github.com/yuin/gopher-lua"
-
-	"gopkg.in/src-d/go-mysql-server.v0"
+	lua "github.com/yuin/gopher-lua"
+	sqle "gopkg.in/src-d/go-mysql-server.v0"
+	"gopkg.in/src-d/go-mysql-server.v0/auth"
 	"gopkg.in/src-d/go-mysql-server.v0/mem"
 	"gopkg.in/src-d/go-mysql-server.v0/server"
 	"gopkg.in/src-d/go-mysql-server.v0/sql"
-	"gopkg.in/src-d/go-vitess.v0/mysql"
+	"gopkg.in/src-d/go-vitess.v1/mysql"
+
+	"github.com/tengattack/gluasql"
 )
 
 var (
 	timeNow time.Time
 )
+
+type staticAuth struct {
+	*mysql.AuthServerStatic
+}
+
+func (sa *staticAuth) Mysql() mysql.AuthServer {
+	return sa.AuthServerStatic
+}
+
+func (sa *staticAuth) Allowed(ctx *sql.Context, permission auth.Permission) error {
+	return nil
+}
 
 func TestMain(m *testing.M) {
 	// prepare mysql server
@@ -30,11 +43,12 @@ func TestMain(m *testing.M) {
 	auth.Entries["user"] = []*mysql.AuthServerStaticEntry{{
 		Password: "pass",
 	}}
+	sa := &staticAuth{AuthServerStatic: auth}
 
 	config := server.Config{
 		Protocol: "tcp",
 		Address:  "localhost:3306",
-		Auth:     auth,
+		Auth:     sa,
 	}
 
 	s, err := server.NewDefaultServer(config, driver)
