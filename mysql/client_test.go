@@ -6,52 +6,39 @@ import (
 	"testing"
 	"time"
 
+	sqle "github.com/dolthub/go-mysql-server"
+	"github.com/dolthub/go-mysql-server/memory"
+	"github.com/dolthub/go-mysql-server/server"
+	"github.com/dolthub/go-mysql-server/sql"
+	"github.com/dolthub/go-mysql-server/sql/types"
 	"github.com/stretchr/testify/assert"
-	lua "github.com/yuin/gopher-lua"
-	sqle "gopkg.in/src-d/go-mysql-server.v0"
-	"gopkg.in/src-d/go-mysql-server.v0/auth"
-	"gopkg.in/src-d/go-mysql-server.v0/mem"
-	"gopkg.in/src-d/go-mysql-server.v0/server"
-	"gopkg.in/src-d/go-mysql-server.v0/sql"
-	"gopkg.in/src-d/go-vitess.v1/mysql"
-
 	"github.com/tengattack/gluasql"
+
+	lua "github.com/yuin/gopher-lua"
 )
 
 var (
-	timeNow time.Time
+	timeNow   time.Time
+	dbName    = "mydb"
+	tableName = "mytable"
+	address   = "localhost"
+	port      = 3306
 )
-
-type staticAuth struct {
-	*mysql.AuthServerStatic
-}
-
-func (sa *staticAuth) Mysql() mysql.AuthServer {
-	return sa.AuthServerStatic
-}
-
-func (sa *staticAuth) Allowed(ctx *sql.Context, permission auth.Permission) error {
-	return nil
-}
 
 func TestMain(m *testing.M) {
 	// prepare mysql server
-	driver := sqle.NewDefault()
-	driver.AddDatabase(createTestDatabase())
-
-	auth := mysql.NewAuthServerStatic()
-	auth.Entries["user"] = []*mysql.AuthServerStaticEntry{{
-		Password: "pass",
-	}}
-	sa := &staticAuth{AuthServerStatic: auth}
+	ctx := sql.NewEmptyContext()
+	engine := sqle.NewDefault(
+		memory.NewDBProvider(
+			createTestDatabase(ctx),
+		))
 
 	config := server.Config{
 		Protocol: "tcp",
-		Address:  "localhost:3306",
-		Auth:     sa,
+		Address:  fmt.Sprintf("%s:%d", address, port),
 	}
 
-	s, err := server.NewDefaultServer(config, driver)
+	s, err := server.NewDefaultServer(config, engine)
 	if err != nil {
 		panic(err)
 	}
@@ -96,35 +83,21 @@ func TestClientClose(t *testing.T) {
 	assert.NoError(L.DoString(script))
 }
 
-func createTestDatabase() *mem.Database {
-	const (
-		dbName    = "test"
-		tableName = "mytable"
-	)
-
-	db := mem.NewDatabase(dbName)
-	table := mem.NewTable(tableName, sql.Schema{
-		{Name: "name", Type: sql.Text, Nullable: false, Source: tableName},
-		{Name: "email", Type: sql.Text, Nullable: false, Source: tableName},
-		{Name: "phone_numbers", Type: sql.JSON, Nullable: false, Source: tableName},
-		{Name: "created_at", Type: sql.Timestamp, Nullable: false, Source: tableName},
-	})
-
+func createTestDatabase(ctx *sql.Context) *memory.Database {
+	db := memory.NewDatabase(dbName)
+	table := memory.NewTable(tableName, sql.NewPrimaryKeySchema(sql.Schema{
+		{Name: "name", Type: types.Text, Nullable: false, Source: tableName},
+		{Name: "email", Type: types.Text, Nullable: false, Source: tableName},
+		{Name: "phone_numbers", Type: types.JSON, Nullable: false, Source: tableName},
+		{Name: "created_at", Type: types.Timestamp, Nullable: false, Source: tableName},
+	}), db.GetForeignKeyCollection())
 	db.AddTable(tableName, table)
-	ctx := sql.NewEmptyContext()
 
-	timeNow = time.Now()
-	rows := []sql.Row{
-		sql.NewRow("John Doe", "john@doe.com", []string{"555-555-555"}, timeNow),
-		sql.NewRow("John Doe", "johnalt@doe.com", []string{}, timeNow),
-		sql.NewRow("Jane Doe", "jane@doe.com", []string{}, timeNow),
-		sql.NewRow("Evil Bob", "evilbob@gmail.com", []string{"555-666-555", "666-666-666"}, timeNow),
-	}
-
-	for _, row := range rows {
-		table.Insert(ctx, row)
-	}
-
+	creationTime := time.Unix(0, 1667304000000001000).UTC()
+	_ = table.Insert(ctx, sql.NewRow("Jane Deo", "janedeo@gmail.com", types.MustJSON(`["556-565-566", "777-777-777"]`), creationTime))
+	_ = table.Insert(ctx, sql.NewRow("Jane Doe", "jane@doe.com", types.MustJSON(`[]`), creationTime))
+	_ = table.Insert(ctx, sql.NewRow("John Doe", "john@doe.com", types.MustJSON(`["555-555-555"]`), creationTime))
+	_ = table.Insert(ctx, sql.NewRow("John Doe", "johnalt@doe.com", types.MustJSON(`[]`), creationTime))
 	return db
 }
 
@@ -132,5 +105,5 @@ func getLuaDbConnection() string {
 	return fmt.Sprintf(`
 		c=require 'mysql'.new();
 		ok, err = c:connect({ host = "%s", port = %d, database = "%s", user = "%s", password = "%s" });
-	`, "localhost", 3306, "test", "user", "pass")
+	`, address, port, dbName, "user", "pass")
 }
