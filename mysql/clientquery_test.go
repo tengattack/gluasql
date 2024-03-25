@@ -9,6 +9,19 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
+var expectedResults = []interface{}{
+	map[string]interface{}{
+		"created_at":    "2022-11-01 12:00:00.000001",
+		"email":         "janedeo@gmail.com",
+		"name":          "Jane Deo",
+		"phone_numbers": "[\"556-565-566\",\"777-777-777\"]"},
+	map[string]interface{}{
+		"created_at":    "2022-11-01 12:00:00.000001",
+		"email":         "jane@doe.com",
+		"name":          "Jane Doe",
+		"phone_numbers": "[]"},
+}
+
 func TestClientQuery(t *testing.T) {
 	assert := assert.New(t)
 
@@ -29,21 +42,7 @@ func TestClientQuery(t *testing.T) {
 	assert.Nil(err)
 
 	// source:
-	// sql.NewRow("John Doe", "john@doe.com", []string{"555-555-555"}, timeNow)
-	// sql.NewRow("John Doe", "johnalt@doe.com", []string{}, timeNow)
-	timeNowFormat := timeNow.UTC().Format("2006-01-02 15:04:05")
-	assert.Equal([]interface{}{
-		map[string]interface{}{
-			"email":         "john@doe.com",
-			"phone_numbers": "[\"555-555-555\"]",
-			"name":          "John Doe",
-			"created_at":    timeNowFormat,
-		},
-		map[string]interface{}{
-			"email":         "johnalt@doe.com",
-			"phone_numbers": "[]",
-			"name":          "John Doe",
-			"created_at":    timeNowFormat,
-		},
-	}, res)
+	// sql.NewRow("Jane Deo", "janedeo@gmail.com", types.MustJSON(`["556-565-566", "777-777-777"]`), creationTime)
+	// sql.NewRow("Jane Doe", "jane@doe.com", types.MustJSON(`[]`), creationTime)
+	assert.Equal(expectedResults, res)
 }
